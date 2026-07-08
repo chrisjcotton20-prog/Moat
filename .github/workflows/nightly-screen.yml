@@ -22,19 +22,23 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build the ticker list
+      - name: Build ticker list and bulk prices
         env:
           SEC_UA: ${{ secrets.SEC_USER_AGENT }}
         run: |
           UNIVERSE="${{ inputs.universe }}"
           UNIVERSE="${UNIVERSE:-sp500}"
           echo "Universe: $UNIVERSE"
+          BASE=https://raw.githubusercontent.com/Ate329/top-us-stock-tickers/main/tickers
+          curl -sL "$BASE/all.csv" -o all.csv
+          echo "ticker,close" > prices.csv
+          tail -n +2 all.csv | awk -F, 'BEGIN{OFS=","}{sym=$1; gsub(/[.\/]/,"-",sym); if($3+0>0) print sym,$3}' >> prices.csv
+          echo "Prices loaded for $(($(wc -l < prices.csv)-1)) tickers"
           if [ "$UNIVERSE" = "sp500" ]; then
-            curl -sL https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv \
-              | tail -n +2 | cut -d, -f1 | tr -d '\r' | sed 's/\./-/g' > screen_list.txt
+            curl -sL "$BASE/sp500.csv" -o sp500.csv
+            tail -n +2 sp500.csv | awk -F, '{sym=$1; gsub(/[.\/]/,"-",sym); print sym}' > screen_list.txt
           elif [ "$UNIVERSE" = "all" ]; then
-            curl -sL -A "$SEC_UA" https://www.sec.gov/files/company_tickers.json \
-              | python -c "import json,sys; d=json.load(sys.stdin); print('\n'.join(sorted(r['ticker'].replace('.','-') for r in d.values())))" > screen_list.txt
+            tail -n +2 all.csv | awk -F, '{sym=$1; gsub(/[.\/]/,"-",sym); print sym}' > screen_list.txt
           else
             cp watchlist.txt screen_list.txt
           fi
@@ -47,7 +51,7 @@ jobs:
           mkdir -p public
           python -m moat.screen \
             --tickers screen_list.txt \
-            --stooq \
+            --prices prices.csv \
             --user-agent "$SEC_UA" \
             --out public/results.json \
             --stamp "$(date -u +%Y-%m-%dT%H:%MZ)"
