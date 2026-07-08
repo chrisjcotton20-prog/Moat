@@ -2,7 +2,13 @@ name: Nightly Moat screen
 on:
   schedule:
     - cron: "0 8 * * 1-5"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      universe:
+        description: "Which universe to screen"
+        type: choice
+        options: [sp500, all, watchlist]
+        default: sp500
 
 permissions:
   contents: write
@@ -15,6 +21,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Build the ticker list
+        env:
+          SEC_UA: ${{ secrets.SEC_USER_AGENT }}
+        run: |
+          UNIVERSE="${{ inputs.universe }}"
+          UNIVERSE="${UNIVERSE:-sp500}"
+          echo "Universe: $UNIVERSE"
+          if [ "$UNIVERSE" = "sp500" ]; then
+            curl -sL https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv \
+              | tail -n +2 | cut -d, -f1 | tr -d '\r' | sed 's/\./-/g' > watchlist.txt
+          elif [ "$UNIVERSE" = "all" ]; then
+            curl -sL -A "$SEC_UA" https://www.sec.gov/files/company_tickers.json \
+              | python -c "import json,sys; d=json.load(sys.stdin); print('\n'.join(sorted(r['ticker'].replace('.','-') for r in d.values())))" > watchlist.txt
+          fi
+          echo "Screening $(wc -l < watchlist.txt) tickers"
       - name: Run screen
         env:
           SEC_UA: ${{ secrets.SEC_USER_AGENT }}
