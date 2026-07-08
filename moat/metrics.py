@@ -84,9 +84,26 @@ def profitable_years(rec: dict) -> tuple[int, int]:
 
 def compute(rec: dict, price: Optional[float], thresholds: dict = None) -> dict:
     t = thresholds or config.GATES
-    eps, bvps = rec.get("eps"), rec.get("bvps")
+    eps = rec.get("eps")
     equity, debt = rec.get("equity"), rec.get("total_debt")
     ni = rec.get("net_income")
+
+    # --- share count: trust the income statement over the cover-page count ---
+    # The reported cover-page share count is fragile for dual-class filers
+    # (it can pick up a tiny share class), which blows up book-value-per-share.
+    # net_income / diluted_EPS gives an internally consistent share count.
+    shares_reported = rec.get("shares")
+    shares = shares_reported
+    share_warning = False
+    if eps not in (None, 0) and ni is not None:
+        implied = ni / eps
+        if implied > 0:
+            if (not shares_reported or shares_reported <= 0
+                    or implied / shares_reported > 2.5
+                    or shares_reported / implied > 2.5):
+                shares = implied            # cover-page count looks wrong; use implied
+                share_warning = bool(shares_reported)
+    bvps = _safe_div(equity, shares)
 
     roe = _safe_div(ni, equity)
     roic = _safe_div(ni, (equity + debt)) if (equity is not None and debt is not None) else _safe_div(ni, equity)
@@ -99,7 +116,15 @@ def compute(rec: dict, price: Optional[float], thresholds: dict = None) -> dict:
         fcf = rec["cfo"] - rec["capex"]
 
     graham = graham_number(eps, bvps)
-    mcap = (price * rec["shares"]) if (price is not None and rec.get("shares")) else None
+    mcap = (price * shares) if (price is not None and shares) else None
+
+    # --- plausibility guard: a target wildly above price signals bad inputs ---
+    # (real deep value rarely exceeds ~3-4x; >8x means a scaling/share-count error)
+    plausible = True
+    if graham is not None and price is not None and price > 0 and graham > 8 * price:
+        plausible = False
+    if bvps is not None and bvps <= 0:
+        plausible = False
     fcf_yield = _safe_div(fcf, mcap)
     pe = _safe_div(price, eps)
     pb = _safe_div(price, bvps)
@@ -158,7 +183,10 @@ def compute(rec: dict, price: Optional[float], thresholds: dict = None) -> dict:
         "gates": gates,
         "passes": passes,
         "signal": signal,
-        "dataComplete": (fscore_max >= 6 and years_avail >= 5),
+        "shares": shares,
+        "plausible": plausible,
+        "shareWarning": share_warning,
+        "dataComplete": (fscore_max >= 6 and years_avail >= 5 and plausible),
     }
 
 

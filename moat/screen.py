@@ -97,7 +97,10 @@ def run(args) -> dict:
             print(f"  [{i}/{len(tickers)}] {tk}: {row.get('signal','-')}", file=sys.stderr)
 
     graded = [r for r in rows if r.get("price") is not None and r.get("graham") is not None]
-    shortlist = sorted((r for r in graded if r["passes"]),
+    # implausible targets (bad share-count / scaling) never reach the shortlist
+    flagged = sorted((r for r in graded if r["passes"] and not r.get("plausible", True)),
+                     key=lambda r: r["mos"], reverse=True)
+    shortlist = sorted((r for r in graded if r["passes"] and r.get("plausible", True)),
                        key=lambda r: r["mos"], reverse=True)
     rejected = sorted((r for r in graded if not r["passes"]),
                       key=lambda r: (r["mos"] if r["mos"] is not None else 9))
@@ -107,9 +110,10 @@ def run(args) -> dict:
         "thresholds": config.GATES,
         "counts": {"screened": len(rows), "graded": len(graded),
                    "shortlist": len(shortlist), "rejected": len(rejected),
-                   "skipped": len(skipped)},
+                   "flagged": len(flagged), "skipped": len(skipped)},
         "shortlist": shortlist,
         "rejected": rejected,
+        "flagged": flagged,
         "no_price": [r["t"] for r in rows if r.get("price") is None],
         "skipped": skipped,
     }
