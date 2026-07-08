@@ -1,0 +1,32 @@
+{
+  "generated": "2026-07-08T12:19Z",
+  "thresholds": {
+    "roe_min": 0.12,
+    "op_margin_min": 0.08,
+    "fscore_min": 5,
+    "debt_to_equity_max": 1.5,
+    "current_ratio_min": 1.0,
+    "min_profitable_years": 8,
+    "min_years_of_data": 5
+  },
+  "counts": {
+    "screened": 8,
+    "graded": 0,
+    "shortlist": 0,
+    "rejected": 0,
+    "skipped": 0
+  },
+  "shortlist": [],
+  "rejected": [],
+  "no_price": [
+    "AAPL",
+    "MSFT",
+    "JNJ",
+    "KO",
+    "PG",
+    "UNH",
+    "HD",
+    "COST"
+  ],
+  "skipped": []
+}
