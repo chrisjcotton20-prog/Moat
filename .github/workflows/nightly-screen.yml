@@ -1,0 +1,35 @@
+name: Nightly Moat screen
+on:
+  schedule:
+    - cron: "0 8 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run screen
+        env:
+          SEC_UA: ${{ secrets.SEC_USER_AGENT }}
+        run: |
+          mkdir -p public
+          python -m moat.screen \
+            --tickers watchlist.txt \
+            --stooq \
+            --user-agent "$SEC_UA" \
+            --out public/results.json \
+            --stamp "$(date -u +%Y-%m-%dT%H:%MZ)"
+      - name: Commit results
+        run: |
+          git config user.name "moat-bot"
+          git config user.email "moat-bot@users.noreply.github.com"
+          git add public/results.json
+          git commit -m "nightly screen $(date -u +%F)" || echo "no changes"
+          git push
