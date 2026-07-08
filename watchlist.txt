@@ -1,0 +1,10 @@
+# One ticker per line. Lines starting with # are ignored.
+# Replace these with names you actually want screened.
+AAPL
+MSFT
+JNJ
+KO
+PG
+UNH
+HD
+COST
