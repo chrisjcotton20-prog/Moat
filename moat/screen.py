@@ -131,6 +131,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     result = run(args)
+    out_dir = os.path.dirname(args.out)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(result, f, indent=2, default=lambda o: None)
     c = result["counts"]
