@@ -274,7 +274,7 @@ function App(){
 
       <div className="stamp">
         <span>Screen run: {data.generated||"—"}</span>
-        {data.counts && <span>{data.counts.shortlist} on shortlist · {data.counts.rejected} rejected · {data.counts.skipped} skipped</span>}
+        {data.counts && <span>{data.counts.shortlist} shortlist · {data.counts.rejected} rejected · {(data.counts.flagged||0)} flagged · {data.counts.skipped} skipped · {(data.no_price||[]).length} no price</span>}
       </div>
       {isSample && <div className="banner">Showing built-in sample data — no results.json found yet. Run the nightly screen and reload.</div>}
 
