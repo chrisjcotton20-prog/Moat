@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Moat — patient-capital screener</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root{
+  --paper:#EEEAE0; --paper-2:#E6E1D5; --panel:#F3EFE6;
+  --ink:#1E2B38; --ink-soft:#5A6470; --rule:#CDC6B6;
+  --pine:#2F6E58; --pine-wash:#CBD9CF;
+  --oxblood:#8F3A2C; --oxblood-wash:#E2CCC4;
+  --brass:#95712F; --brass-wash:#E4D8BE;
+  --font-display: Georgia,'Iowan Old Style','Times New Roman',serif;
+  --font-ui: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-mono: ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-ui);
+  line-height:1.45; -webkit-font-smoothing:antialiased;}
+button{font-family:inherit; cursor:pointer;}
+
+.masthead{display:flex; align-items:flex-end; justify-content:space-between;
+  padding:22px 26px 14px; border-bottom:2px solid var(--ink); flex-wrap:wrap; gap:10px;}
+.wordmark{display:flex; align-items:baseline; gap:10px;}
+.wm-glyph{color:var(--pine); font-size:20px;}
+.wm-name{font-family:var(--font-display); font-size:30px; font-weight:600; letter-spacing:-0.5px;}
+.wm-sub{font-family:var(--font-mono); font-size:11px; color:var(--ink-soft);
+  text-transform:uppercase; letter-spacing:2px;}
+.nav{display:flex; gap:4px;}
+.nav button{background:none; border:none; font-size:13px; color:var(--ink-soft);
+  padding:6px 12px; border-radius:2px;}
+.nav button.on{color:var(--ink); font-weight:600; box-shadow:inset 0 -2px 0 var(--pine);}
+.nav .count{font-family:var(--font-mono); font-size:11px; background:var(--ink); color:var(--paper);
+  border-radius:8px; padding:0 6px; margin-left:4px;}
+
+.stamp{font-family:var(--font-mono); font-size:11px; color:var(--ink-soft);
+  padding:8px 26px; border-bottom:1px solid var(--rule); display:flex; gap:16px; flex-wrap:wrap;}
+.banner{background:var(--brass-wash); color:#5f4a1e; font-size:12px; padding:8px 26px;
+  border-bottom:1px solid var(--rule); font-family:var(--font-mono);}
+
+.pane{padding:26px; max-width:960px; margin:0 auto;}
+.pane-head h1{font-family:var(--font-display); font-size:27px; font-weight:600; margin:0 0 6px;}
+.lede{max-width:60ch; color:var(--ink-soft); font-size:14px; margin:0 0 22px;}
+.lede em{font-style:italic; color:var(--pine); font-weight:600;}
+
+.table{display:flex; flex-direction:column;}
+.tr{display:grid; align-items:center; gap:14px; text-align:left; width:100%;
+  grid-template-columns:2.2fr .8fr .8fr 2fr .8fr .9fr; padding:12px 10px; border:none; background:none;}
+.th{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:1.2px;
+  color:var(--ink-soft); border-bottom:1px solid var(--ink); padding-bottom:8px;}
+.row{border-bottom:1px solid var(--rule); transition:background .12s;}
+.row:hover{background:var(--panel);}
+.c-num,.c-q,.c-sig{font-family:var(--font-mono);}
+.c-num{font-size:14px; text-align:right; font-variant-numeric:tabular-nums;}
+.c-num.strong{font-weight:600;}
+.c-name{display:flex; flex-direction:column; gap:1px;}
+.tk{font-family:var(--font-mono); font-weight:600; font-size:13px; letter-spacing:.5px;}
+.nm{font-size:12px; color:var(--ink-soft);}
+.c-gauge{display:flex; flex-direction:column; gap:5px;}
+.mos{font-family:var(--font-mono); font-size:11px;}
+.fscore{font-family:var(--font-mono); font-size:14px; font-weight:600;}
+.fscore i{font-style:normal; color:var(--ink-soft); font-size:11px; font-weight:400;}
+
+.gauge{position:relative; width:100%; border-radius:2px; overflow:hidden;
+  background:var(--paper-2); border:1px solid var(--rule);}
+.gauge-zone{position:absolute; top:0; bottom:0;}
+.gauge-tick{position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--ink); transform:translateX(-1px);}
+.gauge-marker{position:absolute; top:-3px; bottom:-3px; width:2px; background:#111;
+  transform:translateX(-1px); box-shadow:0 0 0 2px var(--paper);}
+.gauge-legend{display:flex; gap:16px; margin-top:8px; font-family:var(--font-mono);
+  font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-soft);}
+.gauge-legend i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px;}
+
+.chip{font-family:var(--font-mono); text-transform:uppercase; letter-spacing:1px;
+  border:1px solid; border-radius:2px; padding:2px 7px; font-weight:600; white-space:nowrap; font-size:11px;}
+
+.rejected-toggle{margin-top:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+.rejected-toggle button{background:none; border:1px solid var(--rule); color:var(--ink);
+  padding:7px 12px; border-radius:2px; font-size:12px;}
+.rejected-toggle button:hover{border-color:var(--ink);}
+.rejected-toggle .hint{font-size:12px; color:var(--ink-soft); font-style:italic;}
+.table.rejected .tr{grid-template-columns:2.2fr .8fr 3fr .9fr;}
+.row.muted{opacity:.72;}
+.why{font-size:12px; color:var(--oxblood); font-family:var(--font-mono);}
+
+.back{background:none; border:none; color:var(--ink-soft); font-size:13px; padding:0 0 16px;}
+.back:hover{color:var(--ink);}
+.detail-head{display:flex; justify-content:space-between; align-items:flex-start; gap:20px;
+  border-bottom:1px solid var(--ink); padding-bottom:18px; margin-bottom:20px; flex-wrap:wrap;}
+.d-tk{font-family:var(--font-mono); font-size:13px; letter-spacing:2px; color:var(--ink-soft);}
+.d-name{font-family:var(--font-display); font-size:30px; font-weight:600; margin:2px 0 3px;}
+.d-sector{font-size:13px; color:var(--ink-soft);}
+.d-verdict{display:flex; flex-direction:column; align-items:flex-end; gap:6px;
+  border-right:3px solid; padding-right:12px;}
+.d-verdict-note{font-size:12px; color:var(--ink-soft); max-width:22ch; text-align:right;}
+
+.safety-card{background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:20px; margin-bottom:22px;}
+.safety-nums{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px;}
+.safety-nums .k,.hold-nums .k{display:block; font-family:var(--font-mono); font-size:10px;
+  text-transform:uppercase; letter-spacing:1px; color:var(--ink-soft); margin-bottom:3px;}
+.safety-nums .v,.hold-nums .v{font-family:var(--font-mono); font-size:17px; font-variant-numeric:tabular-nums;}
+.safety-nums .v.strong{font-weight:700;}
+
+.cols{display:grid; grid-template-columns:1fr 1.3fr; gap:22px;}
+.gate-card,.ratio-card{background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:18px;}
+.gate-card h2,.ratio-card h2{font-family:var(--font-display); font-size:16px; font-weight:600; margin:0 0 14px;}
+.gate{display:flex; align-items:center; gap:9px; font-size:13px; padding:5px 0;}
+.gate .mark{font-family:var(--font-mono); width:16px; text-align:center; font-weight:700;}
+.gate.ok .mark{color:var(--pine);}
+.gate.no .mark{color:var(--oxblood);}
+.gate.no{color:var(--oxblood);}
+
+.group{margin-bottom:14px;}
+.group-t{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:1.5px;
+  color:var(--ink-soft); border-bottom:1px solid var(--rule); padding-bottom:4px; margin-bottom:6px;}
+.ratio{display:flex; justify-content:space-between; align-items:baseline; padding:4px 0; font-size:13px;}
+.rk{color:var(--ink-soft);}
+.rv{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-weight:600;}
+
+.own-btn{margin-top:22px; width:100%; background:var(--ink); color:var(--paper); border:none;
+  padding:13px; border-radius:3px; font-size:14px;}
+.own-btn:hover{background:#152230;}
+.owned-flag{margin-top:22px; text-align:center; color:var(--pine); font-size:13px; font-family:var(--font-mono);}
+.owned-flag button{margin-left:10px; background:none; border:1px solid var(--rule); color:var(--ink-soft);
+  border-radius:2px; padding:3px 8px; font-size:11px;}
+
+.holdings{display:flex; flex-direction:column; gap:16px;}
+.hold{background:var(--panel); border:1px solid var(--rule); border-radius:3px; padding:18px;}
+.hold-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px;}
+.hold-id{display:flex; flex-direction:column; gap:1px; background:none; border:none; text-align:left;}
+.hold-sig{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:1px;
+  border:1px solid; border-radius:2px; padding:3px 9px; font-weight:600; white-space:nowrap;}
+.hold-nums{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px;}
+.hold-why{margin:10px 0 0; font-size:13px; color:var(--ink-soft); font-style:italic;}
+
+.empty{text-align:center; padding:60px 20px;}
+.empty h1{font-family:var(--font-display); font-size:24px; margin:0 0 10px;}
+.empty p{color:var(--ink-soft); max-width:52ch; margin:0 auto 8px; font-size:14px;}
+.empty code{background:var(--panel); padding:2px 6px; border-radius:3px; font-family:var(--font-mono); font-size:12px;}
+
+.foot{text-align:center; font-size:11px; color:var(--ink-soft); padding:20px;
+  border-top:1px solid var(--rule); margin-top:20px; font-family:var(--font-mono);}
+
+@media (max-width:720px){
+  .tr{grid-template-columns:1.6fr .8fr 1.4fr .8fr; gap:10px;}
+  .cols,.safety-nums,.hold-nums{grid-template-columns:1fr 1fr;}
+  .th .c-gauge,.row .c-gauge{grid-column:span 2;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+/* ---- fallback sample so the page shows something before the first screen ---- */
+const SAMPLE = {
+  generated: "sample",
+  counts: { screened: 3, shortlist: 2, rejected: 1, skipped: 0 },
+  shortlist: [
+    {t:"CRNS",name:"Cornerstone Foods Inc",sector:"Consumer Staples",price:42.10,eps:5.40,bvps:28.5,
+     graham:58.85,mos:0.2846,pe:7.8,pb:1.48,roe:0.1895,roic:0.1421,de:0.333,fcfYield:0.1306,
+     grossMargin:0.418,opMargin:0.20,fScore:8,fScoreMax:8,currentRatio:2.0,yearsPos:6,
+     gates:{profitable:true,roe:true,fcf:true,opMargin:true,fScore:true,debt:true,liquidity:true,consistent:true},
+     passes:true,signal:"BUY"},
+    {t:"AZTC",name:"Aztec Software Corp",sector:"Technology",price:210.40,eps:6.10,bvps:23.6,
+     graham:56.91,mos:-2.697,pe:34.5,pb:8.9,roe:0.258,roic:0.242,de:0.068,fcfYield:0.030,
+     grossMargin:0.79,opMargin:0.34,fScore:8,fScoreMax:8,currentRatio:3.5,yearsPos:6,
+     gates:{profitable:true,roe:true,fcf:true,opMargin:true,fScore:true,debt:true,liquidity:true,consistent:true},
+     passes:true,signal:"RICH"},
+  ],
+  rejected: [
+    {t:"GLDN",name:"Golden Mile Mining Co",sector:"Materials",price:8.40,graham:25.04,mos:0.664,
+     gates:{profitable:true,roe:false,fcf:false,opMargin:false,fScore:true,debt:false,liquidity:false,consistent:true},
+     passes:false,signal:"REJECTED"},
+  ],
+};
+
+const SIGNAL_META = {
+  BUY:{color:"var(--pine)",label:"Buy",note:"Below your target, quality intact"},
+  WATCH:{color:"var(--brass)",label:"Watch",note:"Fairly priced — wait for a pullback"},
+  RICH:{color:"var(--oxblood)",label:"Rich",note:"Good business, too expensive today"},
+  REJECTED:{color:"var(--ink-soft)",label:"Fails gates",note:"Cheap, but not a quality business"},
+};
+const GATE_LABEL = {
+  profitable:"Profitable", roe:"ROE ≥ 12%", fcf:"Positive free cash flow",
+  opMargin:"Operating margin > 8%", fScore:"Piotroski ≥ 5", debt:"Debt/equity < 1.5",
+  liquidity:"Current ratio > 1.0", consistent:"Long record of profits",
+};
+
+const fmt=(n,d=2)=> (n==null||isNaN(n))?"—":Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=(n)=> (n==null||isNaN(n))?"—":`${n>=0?"":"\u2212"}${Math.abs(n*100).toFixed(0)}%`;
+const money=(n)=> (n==null||isNaN(n))?"—":`$${fmt(n)}`;
+
+function Gauge({price,fair,height=10}){
+  if(!fair||!price) return null;
+  const span=fair*2, clamp=(v)=>Math.max(0,Math.min(100,v));
+  const posPrice=clamp((price/span)*100), posFair=50, posRich=clamp((fair*1.5/span)*100);
+  return (
+    <div className="gauge" style={{height}}>
+      <div className="gauge-zone" style={{left:0,width:`${posFair}%`,background:"var(--pine-wash)"}}/>
+      <div className="gauge-zone" style={{left:`${posFair}%`,width:`${posRich-posFair}%`,background:"var(--brass-wash)"}}/>
+      <div className="gauge-zone" style={{left:`${posRich}%`,right:0,background:"var(--oxblood-wash)"}}/>
+      <div className="gauge-tick" style={{left:`${posFair}%`}}/>
+      <div className="gauge-marker" style={{left:`${posPrice}%`}}/>
+    </div>
+  );
+}
+function SignalChip({signal}){
+  const m=SIGNAL_META[signal]||SIGNAL_META.REJECTED;
+  return <span className="chip" style={{color:m.color,borderColor:m.color}}>{m.label}</span>;
+}
+function sellSignal(row){
+  if(!row||row.price==null||row.graham==null) return {label:"No current data",level:"watch",why:"This holding wasn't in the latest screen, so there's no fresh price to judge."};
+  if(!row.passes) return {label:"Review — thesis weakening",level:"sell",why:"A quality or strength gate that held at purchase no longer passes."};
+  if(row.price>row.graham*1.5) return {label:"Trim — richly valued",level:"trim",why:`Price is above the richly-valued line (${money(row.graham*1.5)}). Future returns from here are thin.`};
+  if(row.price>row.graham*1.2) return {label:"Watch — above fair value",level:"watch",why:"Trading over fair value but not extended. No action needed."};
+  return {label:"Hold",level:"hold",why:"Business still compounding and price is reasonable. Patience pays."};
+}
+const SELL_COLOR={hold:"var(--pine)",watch:"var(--brass)",trim:"var(--oxblood)",sell:"var(--oxblood)"};
+
+function App(){
+  const [data,setData]=useState(null);
+  const [isSample,setIsSample]=useState(false);
+  const [view,setView]=useState("shortlist");
+  const [selected,setSelected]=useState(null);
+  const [showRejected,setShowRejected]=useState(false);
+  const [owned,setOwned]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("moat_holdings")||"{}");}catch(e){return {};}
+  });
+
+  useEffect(()=>{
+    const tryFetch=async(paths)=>{
+      for(const p of paths){
+        try{ const r=await fetch(p,{cache:"no-store"}); if(r.ok) return await r.json(); }catch(e){}
+      }
+      return null;
+    };
+    tryFetch(["public/results.json","results.json"]).then(j=>{
+      if(j){ setData(j); setIsSample(false); }
+      else { setData(SAMPLE); setIsSample(true); }
+    });
+  },[]);
+
+  const saveOwned=(next)=>{ setOwned(next); localStorage.setItem("moat_holdings",JSON.stringify(next)); };
+  const addHolding=(row)=>{ saveOwned({...owned,[row.t]:{entry:row.price,added:new Date().toISOString().slice(0,10)}}); setSelected(null); setView("holdings"); };
+  const removeHolding=(t)=>{ const n={...owned}; delete n[t]; saveOwned(n); };
+
+  const all=useMemo(()=> data?[...(data.shortlist||[]),...(data.rejected||[])]:[],[data]);
+  const current=selected? all.find(r=>r.t===selected):null;
+
+  if(!data) return <div className="pane"><p style={{color:"var(--ink-soft)"}}>Loading…</p></div>;
+
+  return (
+    <div>
+      <header className="masthead">
+        <div className="wordmark">
+          <span className="wm-glyph">▟</span>
+          <span className="wm-name">Moat</span>
+          <span className="wm-sub">patient-capital screener</span>
+        </div>
+        <nav className="nav">
+          <button className={view==="shortlist"?"on":""} onClick={()=>{setView("shortlist");setSelected(null);}}>Shortlist</button>
+          <button className={view==="holdings"?"on":""} onClick={()=>{setView("holdings");setSelected(null);}}>
+            Holdings <span className="count">{Object.keys(owned).length}</span>
+          </button>
+        </nav>
+      </header>
+
+      <div className="stamp">
+        <span>Screen run: {data.generated||"—"}</span>
+        {data.counts && <span>{data.counts.shortlist} on shortlist · {data.counts.rejected} rejected · {data.counts.skipped} skipped</span>}
+      </div>
+      {isSample && <div className="banner">Showing built-in sample data — no results.json found yet. Run the nightly screen and reload.</div>}
+
+      {current
+        ? <Detail row={current} owned={!!owned[current.t]} onBack={()=>setSelected(null)} onAdd={()=>addHolding(current)} onRemove={()=>removeHolding(current.t)} />
+        : view==="shortlist"
+          ? <Shortlist data={data} showRejected={showRejected} setShowRejected={setShowRejected} onOpen={setSelected} />
+          : <Holdings owned={owned} all={all} onOpen={(t)=>setSelected(t)} onRemove={removeHolding} />
+      }
+
+      <footer className="foot">
+        Fundamentals from SEC EDGAR · prices from Stooq · refreshed by your nightly screen. Not investment advice.
+      </footer>
+    </div>
+  );
+}
+
+function Shortlist({data,showRejected,setShowRejected,onOpen}){
+  const rows=data.shortlist||[]; const rejected=data.rejected||[];
+  return (
+    <main className="pane">
+      <div className="pane-head">
+        <h1>Undervalued, defensible</h1>
+        <p className="lede">Businesses that clear every quality and strength gate, ranked by how far today's price sits below its buy target. The bar is your <em>margin of safety</em>.</p>
+      </div>
+      <div className="table">
+        <div className="tr th">
+          <span className="c-name">Company</span><span className="c-num">Price</span>
+          <span className="c-num">Target</span><span className="c-gauge">Margin of safety</span>
+          <span className="c-q">Quality</span><span className="c-sig">Signal</span>
+        </div>
+        {rows.length===0 && <p style={{color:"var(--ink-soft)",padding:"14px 10px"}}>Nothing cleared the gates in this run.</p>}
+        {rows.map(c=>(
+          <button key={c.t} className="tr row" onClick={()=>onOpen(c.t)}>
+            <span className="c-name"><span className="tk">{c.t}</span><span className="nm">{c.name}</span></span>
+            <span className="c-num">{money(c.price)}</span>
+            <span className="c-num strong">{money(c.graham)}</span>
+            <span className="c-gauge">
+              <Gauge price={c.price} fair={c.graham}/>
+              <span className="mos" style={{color:c.mos>=0?"var(--pine)":"var(--oxblood)"}}>
+                {c.mos==null?"—":c.mos>=0?`${pct(c.mos)} below`:`${pct(-c.mos)} above`}
+              </span>
+            </span>
+            <span className="c-q"><span className="fscore">{c.fScore}<i>/{c.fScoreMax||9}</i></span></span>
+            <span className="c-sig"><SignalChip signal={c.signal}/></span>
+          </button>
+        ))}
+      </div>
+      <div className="rejected-toggle">
+        <button onClick={()=>setShowRejected(v=>!v)}>{showRejected?"Hide":"Show"} {rejected.length} names the gates rejected</button>
+        <span className="hint">cheap, but they fail quality or strength — the filter earning its keep</span>
+      </div>
+      {showRejected && (
+        <div className="table rejected">
+          {rejected.map(c=>{
+            const failed=Object.entries(c.gates||{}).filter(([,v])=>!v).map(([k])=>GATE_LABEL[k]);
+            return (
+              <button key={c.t} className="tr row muted" onClick={()=>onOpen(c.t)}>
+                <span className="c-name"><span className="tk">{c.t}</span><span className="nm">{c.name}</span></span>
+                <span className="c-num">{money(c.price)}</span>
+                <span className="why">Failed: {failed.slice(0,3).join(", ")}{failed.length>3?"…":""}</span>
+                <span className="c-sig"><SignalChip signal="REJECTED"/></span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </main>
+  );
+}
+
+function Detail({row,owned,onBack,onAdd,onRemove}){
+  const m=SIGNAL_META[row.signal]||SIGNAL_META.REJECTED;
+  const ceiling=row.graham?row.graham*1.5:null;
+  const R=({k,v,good})=>(
+    <div className="ratio"><span className="rk">{k}</span>
+      <span className="rv" style={good===undefined?{}:{color:good?"var(--pine)":"var(--oxblood)"}}>{v}</span></div>
+  );
+  return (
+    <main className="pane">
+      <button className="back" onClick={onBack}>← Back</button>
+      <div className="detail-head">
+        <div>
+          <div className="d-tk">{row.t}</div>
+          <h1 className="d-name">{row.name}</h1>
+          <div className="d-sector">{row.sector||"—"}{row.fiscalYear?` · FY${row.fiscalYear}`:""}</div>
+        </div>
+        <div className="d-verdict" style={{borderColor:m.color}}>
+          <SignalChip signal={row.signal}/>
+          <span className="d-verdict-note">{m.note}</span>
+        </div>
+      </div>
+      <section className="safety-card">
+        <div className="safety-nums">
+          <div><span className="k">Price today</span><span className="v">{money(row.price)}</span></div>
+          <div><span className="k">Buy target</span><span className="v strong">{money(row.graham)}</span></div>
+          <div><span className="k">Margin of safety</span>
+            <span className="v" style={{color:row.mos>=0?"var(--pine)":"var(--oxblood)"}}>
+              {row.mos==null?"—":row.mos>=0?`${pct(row.mos)} below`:`${pct(-row.mos)} above`}</span></div>
+          <div><span className="k">Richly-valued line</span><span className="v">{money(ceiling)}</span></div>
+        </div>
+        <Gauge price={row.price} fair={row.graham} height={16}/>
+        <div className="gauge-legend">
+          <span><i style={{background:"var(--pine)"}}/> Buy zone</span>
+          <span><i style={{background:"var(--brass)"}}/> Fair</span>
+          <span><i style={{background:"var(--oxblood)"}}/> Rich</span>
+        </div>
+      </section>
+      <div className="cols">
+        <section className="gate-card">
+          <h2>Does it clear the gates?</h2>
+          {Object.entries(row.gates||{}).map(([k,v])=>(
+            <div key={k} className={`gate ${v?"ok":"no"}`}><span className="mark">{v?"✓":"✕"}</span><span>{GATE_LABEL[k]||k}</span></div>
+          ))}
+        </section>
+        <section className="ratio-card">
+          <h2>The numbers</h2>
+          <div className="group"><div className="group-t">Quality</div>
+            <R k="Return on equity" v={pct(row.roe)} good={row.roe>=0.12}/>
+            <R k="Return on capital" v={pct(row.roic)} good={row.roic>=0.09}/>
+            <R k="Gross margin" v={pct(row.grossMargin)}/>
+            <R k="Operating margin" v={pct(row.opMargin)} good={row.opMargin>0.08}/>
+            <R k="Piotroski F-Score" v={`${row.fScore} / ${row.fScoreMax||9}`} good={row.fScore>=5}/>
+          </div>
+          <div className="group"><div className="group-t">Strength</div>
+            <R k="Debt / equity" v={fmt(row.de)} good={row.de<1.5}/>
+            <R k="Current ratio" v={fmt(row.currentRatio)} good={row.currentRatio>1}/>
+            <R k="Years profitable" v={row.yearsPos!=null?String(row.yearsPos):"—"} good={row.yearsPos>=8}/>
+          </div>
+          <div className="group"><div className="group-t">Value</div>
+            <R k="P / E" v={row.pe?fmt(row.pe,1):"—"}/>
+            <R k="P / B" v={row.pb?fmt(row.pb,1):"—"}/>
+            <R k="Free-cash-flow yield" v={pct(row.fcfYield)} good={row.fcfYield>0.05}/>
+          </div>
+        </section>
+      </div>
+      {owned
+        ? <div className="owned-flag">Tracked in your holdings.<button onClick={onRemove}>remove</button></div>
+        : <button className="own-btn" onClick={onAdd}>I bought this — track it in Holdings</button>}
+    </main>
+  );
+}
+
+function Holdings({owned,all,onOpen,onRemove}){
+  const rows=Object.entries(owned).map(([t,pos])=>({t,pos,cur:all.find(r=>r.t===t)}));
+  if(rows.length===0) return (
+    <main className="pane"><div className="empty">
+      <h1>No holdings yet</h1>
+      <p>Open a name from the shortlist and mark it bought. It'll show up here with a sell indicator that watches the thesis for you.</p>
+      <p>Holdings are saved in this browser only.</p>
+    </div></main>
+  );
+  return (
+    <main className="pane">
+      <div className="pane-head">
+        <h1>Holdings</h1>
+        <p className="lede">The sell indicator is a thesis check, not a timing call — it speaks up when a business breaks or the price outruns the value.</p>
+      </div>
+      <div className="holdings">
+        {rows.map(({t,pos,cur})=>{
+          const price=cur?cur.price:null;
+          const gain=(price!=null&&pos.entry)?(price-pos.entry)/pos.entry:null;
+          const s=sellSignal(cur);
+          return (
+            <div key={t} className="hold">
+              <div className="hold-top">
+                <button className="hold-id" onClick={()=>cur&&onOpen(t)}>
+                  <span className="tk">{t}</span><span className="nm">{cur?cur.name:"—"}</span>
+                </button>
+                <span className="hold-sig" style={{color:SELL_COLOR[s.level],borderColor:SELL_COLOR[s.level]}}>{s.label}</span>
+              </div>
+              <div className="hold-nums">
+                <div><span className="k">Entry</span><span className="v">{money(pos.entry)}</span></div>
+                <div><span className="k">Now</span><span className="v">{money(price)}</span></div>
+                <div><span className="k">Return</span><span className="v" style={{color:gain>=0?"var(--pine)":"var(--oxblood)"}}>{gain==null?"—":`${gain>=0?"+":"\u2212"}${Math.abs(gain*100).toFixed(1)}%`}</span></div>
+                <div><span className="k">vs. fair value</span><span className="v">{cur&&cur.graham?(price>=cur.graham?`${pct((price-cur.graham)/cur.graham)} over`:`${pct((cur.graham-price)/cur.graham)} under`):"—"}</span></div>
+              </div>
+              <Gauge price={price} fair={cur?cur.graham:null} height={12}/>
+              <p className="hold-why">{s.why} <button style={{marginLeft:8,background:"none",border:"none",color:"var(--ink-soft)",textDecoration:"underline",cursor:"pointer",fontSize:12}} onClick={()=>onRemove(t)}>remove</button></p>
+            </div>
+          );
+        })}
+      </div>
+    </main>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
