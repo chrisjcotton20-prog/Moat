@@ -1,0 +1,6 @@
+screen_list.txt
+prices.csv
+all.csv
+sp500.csv
+__pycache__/
+*.pyc
