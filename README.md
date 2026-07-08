@@ -84,3 +84,32 @@ python test_engine.py
 ```
 Regenerates the synthetic companies and checks extraction, Graham math, gates,
 F-score, and signals against hand-computed values.
+
+---
+
+## The dashboard (index.html)
+
+`index.html` is the Moat UI — a single self-contained file, no build step. It
+reads `public/results.json` and renders the shortlist, per-stock detail, and a
+Holdings tab (saved in your browser). Before the first screen runs it shows
+built-in sample data with a banner.
+
+### Deploy it (browser only)
+1. Put `index.html` at the repo root (it's already here).
+2. **GitHub Pages:** repo Settings > Pages > Deploy from a branch > `main` / root.
+   Open the URL it gives you. (Pages needs a public repo on the free plan.)
+3. **Vercel (alternative):** import the repo, framework preset "Other", no build
+   command. Works with private repos too.
+
+## Choosing what to screen
+The nightly workflow has a `universe` dropdown (Actions > Run workflow):
+- **sp500** — the S&P 500 (~503 names), fetched fresh each run. Start here.
+- **all** — every SEC filer (~13k). Works, but per-symbol prices make it slow;
+  best on a public repo. The proper full-market fix is bulk Stooq prices.
+- **watchlist** — your own `watchlist.txt`.
+
+## Note on the workflow
+The ticker list is written to `screen_list.txt` (git-ignored) so `watchlist.txt`
+is never modified and the working tree stays clean. The commit step uses
+`git pull --rebase --autostash` so a browser commit made mid-run can't cause a
+push rejection.
