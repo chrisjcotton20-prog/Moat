@@ -16,6 +16,20 @@ def _safe_div(a, b):
     return a / b
 
 
+def cagr(series: dict) -> float:
+    """Compound annual growth rate from a {year: value} series. None if not computable."""
+    if not series:
+        return None
+    yrs = sorted(series.keys())
+    if len(yrs) < 3:
+        return None
+    first, last = series[yrs[0]], series[yrs[-1]]
+    n = yrs[-1] - yrs[0]
+    if first is None or last is None or first <= 0 or last <= 0 or n <= 0:
+        return None
+    return (last / first) ** (1.0 / n) - 1.0
+
+
 def graham_number(eps: Optional[float], bvps: Optional[float]) -> Optional[float]:
     if eps is None or bvps is None or eps <= 0 or bvps <= 0:
         return None
@@ -186,6 +200,8 @@ def compute(rec: dict, price: Optional[float], thresholds: dict = None) -> dict:
         "shares": shares,
         "plausible": plausible,
         "shareWarning": share_warning,
+        "revenueCagr": cagr(rec.get("revenue_by_year", {})),
+        "earningsCagr": cagr(rec.get("ni_by_year", {})),
         "dataComplete": (fscore_max >= 6 and years_avail >= 5 and plausible),
     }
 

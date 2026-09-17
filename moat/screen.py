@@ -22,7 +22,7 @@ import json
 import os
 import sys
 
-from . import config, edgar, prices as price_mod, metrics
+from . import config, edgar, prices as price_mod, metrics, compounders
 
 
 def _load_tickers(path: str) -> list[str]:
@@ -96,6 +96,22 @@ def run(args) -> dict:
             (skipped if row.get("skipped") else rows).append(row)
             print(f"  [{i}/{len(tickers)}] {tk}: {row.get('signal','-')}", file=sys.stderr)
 
+    # attach sector + market cap from the daily metadata file (peer grouping + size)
+    meta = price_mod.load_meta(args.meta) if getattr(args, "meta", None) else {}
+    computed = [r for r in rows if not r.get("skipped")]
+    for r in computed:
+        m = meta.get(r["t"])
+        if m:
+            if m.get("sector"):
+                r["sector"] = m["sector"]
+            if m.get("market_cap"):
+                r["marketCap"] = m["market_cap"]
+
+    # second lens: overlooked compounders (peer-relative, needs the whole set)
+    returns = price_mod.load_returns(args.history, config.COMPOUNDERS["lag_lookback_days"]) \
+        if getattr(args, "history", None) else {}
+    comp = compounders.evaluate(computed, returns=returns)
+
     graded = [r for r in rows if r.get("price") is not None and r.get("graham") is not None]
     # implausible targets (bad share-count / scaling) never reach the shortlist
     flagged = sorted((r for r in graded if r["passes"] and not r.get("plausible", True)),
@@ -116,6 +132,8 @@ def run(args) -> dict:
         "flagged": flagged,
         "no_price": [r["t"] for r in rows if r.get("price") is None],
         "skipped": skipped,
+        "compounders": {"generated": args.stamp, "thresholds": config.COMPOUNDERS,
+                        "counts": comp["counts"], "candidates": comp["candidates"]},
     }
 
 
@@ -131,18 +149,29 @@ def main(argv=None):
     ap.add_argument("--user-agent", default=config.DEFAULT_USER_AGENT,
                     help="SEC requires a descriptive UA with contact email")
     ap.add_argument("--out", default="results.json")
+    ap.add_argument("--meta", help="CSV ticker,sector,marketcap (peer grouping + size gate)")
+    ap.add_argument("--history", help="long-format price history CSV date,ticker,close (price-lag)")
+    ap.add_argument("--compounders-out", help="where to write the Overlooked Compounders results")
     ap.add_argument("--stamp", default="", help="timestamp label for the output")
     args = ap.parse_args(argv)
 
     result = run(args)
+    comp = result.pop("compounders", None)
     out_dir = os.path.dirname(args.out)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(result, f, indent=2, default=lambda o: None)
+    if comp and args.compounders_out:
+        cdir = os.path.dirname(args.compounders_out)
+        if cdir:
+            os.makedirs(cdir, exist_ok=True)
+        with open(args.compounders_out, "w") as f:
+            json.dump(comp, f, indent=2, default=lambda o: None)
     c = result["counts"]
+    extra = f", {comp['counts']['candidates']} compounders" if comp else ""
     print(f"\nDone. {c['shortlist']} on the shortlist, {c['rejected']} rejected, "
-          f"{c['skipped']} skipped. Wrote {args.out}", file=sys.stderr)
+          f"{c['skipped']} skipped{extra}. Wrote {args.out}", file=sys.stderr)
     return result
 
 

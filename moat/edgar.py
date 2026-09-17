@@ -222,8 +222,9 @@ def extract_fundamentals(facts: dict) -> dict:
             "cfo": g(cfo, py),
             "shares_series": shares,  # placeholder; share issuance handled below
         },
-        # multi-year net income for the "years profitable" gate
+        # multi-year series for the "years profitable" gate and growth rates
         "ni_by_year": ni,
+        "revenue_by_year": rev,
         "eps_by_year": {**eps_b, **eps_d},
         "prior_year": py,
     }

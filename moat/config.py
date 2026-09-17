@@ -75,3 +75,19 @@ INSTANT_CONCEPTS = {
     "long_term_debt", "long_term_debt_current", "short_term_debt",
     "shares_outstanding", "shares_outstanding_dei",
 }
+
+
+# ---- "Overlooked Compounders" lens (second, peer-relative analysis) ----------
+# Strong, growing, financially-sound businesses trading cheap vs. quality peers.
+COMPOUNDERS = {
+    "roe_min": 0.15,            # compounder-grade returns
+    "op_margin_min": 0.10,
+    "debt_to_equity_max": 1.0,  # clean balance sheet ("strong footing")
+    "fscore_min": 6,
+    "growth_min": 0.07,         # revenue OR earnings CAGR >= 7% (must actually compound)
+    "market_cap_min": 1e9,      # no micro-caps
+    "peg_buy_max": 1.5,         # not overpaying for the growth
+    "peer_discount_min": 0.05,  # >=5% below the sector's quality-peer median P/E
+    "min_peers": 3,             # need >=3 quality names in a sector for a stable median
+    "lag_lookback_days": 250,   # ~12 trading months for the price-lag signal
+}
