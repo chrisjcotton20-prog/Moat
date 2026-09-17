@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build ticker list and bulk prices
+      - name: Build lists, prices, meta, and price history
         env:
           SEC_UA: ${{ secrets.SEC_USER_AGENT }}
         run: |
@@ -31,20 +31,20 @@ jobs:
           echo "Universe: $UNIVERSE"
           BASE=https://raw.githubusercontent.com/Ate329/top-us-stock-tickers/main/tickers
           curl -sL "$BASE/all.csv" -o all.csv
-          echo "ticker,close" > prices.csv
-          tail -n +2 all.csv | awk -F, 'BEGIN{OFS=","}{sym=$1; gsub(/[.\/]/,"-",sym); if($3+0>0) print sym,$3}' >> prices.csv
-          echo "Prices loaded for $(($(wc -l < prices.csv)-1)) tickers"
+          # prices.csv + meta.csv + append to committed price_history.csv
+          python tools/build_inputs.py all.csv
+          # ticker list for the chosen universe
           if [ "$UNIVERSE" = "sp500" ]; then
             curl -sL "$BASE/sp500.csv" -o sp500.csv
-            tail -n +2 sp500.csv | awk -F, '{sym=$1; gsub(/[.\/]/,"-",sym); print sym}' > screen_list.txt
+            tail -n +2 sp500.csv | cut -d, -f1 | tr -d '\r' | sed 's/[./]/-/g' > screen_list.txt
           elif [ "$UNIVERSE" = "all" ]; then
-            tail -n +2 all.csv | awk -F, '{sym=$1; gsub(/[.\/]/,"-",sym); print sym}' > screen_list.txt
+            tail -n +2 all.csv | cut -d, -f1 | tr -d '\r' | sed 's/[./]/-/g' > screen_list.txt
           else
             cp watchlist.txt screen_list.txt
           fi
           echo "Screening $(grep -vc '^#' screen_list.txt) tickers"
 
-      - name: Run screen
+      - name: Run both screens
         env:
           SEC_UA: ${{ secrets.SEC_USER_AGENT }}
         run: |
@@ -52,15 +52,18 @@ jobs:
           python -m moat.screen \
             --tickers screen_list.txt \
             --prices prices.csv \
+            --meta meta.csv \
+            --history price_history.csv \
             --user-agent "$SEC_UA" \
             --out public/results.json \
+            --compounders-out public/compounders.json \
             --stamp "$(date -u +%Y-%m-%dT%H:%MZ)"
 
-      - name: Commit results
+      - name: Commit results + accumulated price history
         run: |
           git config user.name "moat-bot"
           git config user.email "moat-bot@users.noreply.github.com"
-          git add public/results.json
+          git add public/results.json public/compounders.json price_history.csv
           git commit -m "nightly screen $(date -u +%F)" || { echo "no changes"; exit 0; }
           git pull --rebase --autostash origin main
           git push
