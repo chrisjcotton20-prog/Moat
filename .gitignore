@@ -1,6 +1,9 @@
+# throwaway build artifacts (rebuilt every run)
 screen_list.txt
 prices.csv
+meta.csv
 all.csv
 sp500.csv
 __pycache__/
 *.pyc
+# NOTE: price_history.csv is intentionally NOT ignored — it accumulates and is committed.

@@ -228,6 +228,7 @@ function App(){
   const [data,setData]=useState(null);
   const [isSample,setIsSample]=useState(false);
   const [view,setView]=useState("shortlist");
+  const [comp,setComp]=useState(null);
   const [selected,setSelected]=useState(null);
   const [showRejected,setShowRejected]=useState(false);
   const [owned,setOwned]=useState(()=>{
@@ -245,13 +246,19 @@ function App(){
       if(j){ setData(j); setIsSample(false); }
       else { setData(SAMPLE); setIsSample(true); }
     });
+    tryFetch(["public/compounders.json","compounders.json"]).then(j=>{ if(j) setComp(j); });
   },[]);
 
   const saveOwned=(next)=>{ setOwned(next); localStorage.setItem("moat_holdings",JSON.stringify(next)); };
   const addHolding=(row)=>{ saveOwned({...owned,[row.t]:{entry:row.price,added:new Date().toISOString().slice(0,10)}}); setSelected(null); setView("holdings"); };
   const removeHolding=(t)=>{ const n={...owned}; delete n[t]; saveOwned(n); };
 
-  const all=useMemo(()=> data?[...(data.shortlist||[]),...(data.rejected||[])]:[],[data]);
+  const all=useMemo(()=>{
+    const base = data?[...(data.shortlist||[]),...(data.rejected||[]),...(data.flagged||[])]:[];
+    const comps = (comp&&comp.candidates)||[];
+    const seen=new Set(base.map(r=>r.t));
+    return [...base, ...comps.filter(c=>!seen.has(c.t))];
+  },[data,comp]);
   const current=selected? all.find(r=>r.t===selected):null;
 
   if(!data) return <div className="pane"><p style={{color:"var(--ink-soft)"}}>Loading…</p></div>;
@@ -265,7 +272,8 @@ function App(){
           <span className="wm-sub">patient-capital screener</span>
         </div>
         <nav className="nav">
-          <button className={view==="shortlist"?"on":""} onClick={()=>{setView("shortlist");setSelected(null);}}>Shortlist</button>
+          <button className={view==="shortlist"?"on":""} onClick={()=>{setView("shortlist");setSelected(null);}}>Value</button>
+          <button className={view==="compounders"?"on":""} onClick={()=>{setView("compounders");setSelected(null);}}>Compounders</button>
           <button className={view==="holdings"?"on":""} onClick={()=>{setView("holdings");setSelected(null);}}>
             Holdings <span className="count">{Object.keys(owned).length}</span>
           </button>
@@ -274,7 +282,8 @@ function App(){
 
       <div className="stamp">
         <span>Screen run: {data.generated||"—"}</span>
-        {data.counts && <span>{data.counts.shortlist} shortlist · {data.counts.rejected} rejected · {(data.counts.flagged||0)} flagged · {data.counts.skipped} skipped · {(data.no_price||[]).length} no price</span>}
+        {view!=="compounders" && data.counts && <span>{data.counts.shortlist} shortlist · {data.counts.rejected} rejected · {(data.counts.flagged||0)} flagged · {data.counts.skipped} skipped · {(data.no_price||[]).length} no price</span>}
+        {view==="compounders" && comp && comp.counts && <span>{comp.counts.BUY} buy · {comp.counts.WATCH} watch · {comp.counts.FAIR} fair {comp.counts.hasPriceHistory?"· price-lag active":"· price-lag building"}</span>}
       </div>
       {isSample && <div className="banner">Showing built-in sample data — no results.json found yet. Run the nightly screen and reload.</div>}
 
@@ -282,7 +291,9 @@ function App(){
         ? <Detail row={current} owned={!!owned[current.t]} onBack={()=>setSelected(null)} onAdd={()=>addHolding(current)} onRemove={()=>removeHolding(current.t)} />
         : view==="shortlist"
           ? <Shortlist data={data} showRejected={showRejected} setShowRejected={setShowRejected} onOpen={setSelected} />
-          : <Holdings owned={owned} all={all} onOpen={(t)=>setSelected(t)} onRemove={removeHolding} />
+          : view==="compounders"
+            ? <Compounders comp={comp} onOpen={setSelected} />
+            : <Holdings owned={owned} all={all} onOpen={(t)=>setSelected(t)} onRemove={removeHolding} />
       }
 
       <footer className="foot">
@@ -458,6 +469,71 @@ function Holdings({owned,all,onOpen,onRemove}){
           );
         })}
       </div>
+    </main>
+  );
+}
+
+const CSIG={BUY:{c:"var(--pine)",l:"Buy"},WATCH:{c:"var(--brass)",l:"Watch"},FAIR:{c:"var(--ink-soft)",l:"Fair"}};
+const CCOLS="2fr 0.7fr 1.3fr 0.7fr 0.7fr 0.9fr";
+
+function Compounders({comp,onOpen}){
+  const [showFair,setShowFair]=React.useState(false);
+  if(!comp) return (
+    <main className="pane"><div className="empty">
+      <h1>Overlooked Compounders</h1>
+      <p>This second screen hasn't run yet. Once your nightly workflow writes <code>public/compounders.json</code>, this tab fills in.</p>
+      <p>It hunts for strong, growing businesses trading cheap versus their quality peers — a relative lens, so it always has candidates even when nothing is absolutely cheap.</p>
+    </div></main>
+  );
+  const cands=comp.candidates||[];
+  const main=cands.filter(c=>c.cSignal!=="FAIR");
+  const fair=cands.filter(c=>c.cSignal==="FAIR");
+  const Row=(c)=>{
+    const s=CSIG[c.cSignal]||CSIG.FAIR;
+    return (
+      <button key={c.t} className="tr row" style={{gridTemplateColumns:CCOLS}} onClick={()=>onOpen(c.t)}>
+        <span className="c-name">
+          <span className="tk">{c.t} {c.laggedPeers===true && <em title="Price lagged its peers" style={{fontStyle:"normal",color:"var(--pine)"}}>▼lag</em>}</span>
+          <span className="nm">{c.name} · {c.sector||"—"}</span>
+        </span>
+        <span className="c-num">{c.pe?fmt(c.pe,1):"—"}</span>
+        <span className="c-num" style={{color:c.peerDiscount>0?"var(--pine)":"var(--oxblood)"}}>
+          {c.peerDiscount==null?"—":`${pct(c.peerDiscount)} vs ${c.sectorMedianPE?fmt(c.sectorMedianPE,0):"—"}`}
+        </span>
+        <span className="c-num">{c.growth==null?"—":pct(c.growth)}</span>
+        <span className="c-num">{c.peg==null?"—":fmt(c.peg,1)}</span>
+        <span className="c-sig"><span className="chip" style={{color:s.c,borderColor:s.c}}>{s.l}</span></span>
+      </button>
+    );
+  };
+  return (
+    <main className="pane">
+      <div className="pane-head">
+        <h1>Overlooked compounders</h1>
+        <p className="lede">Strong, growing businesses trading cheap versus their <em>quality peers</em> and their own growth — laggards that may be due for a catch-up. Ranked by discount to the sector's peer median P/E.</p>
+      </div>
+      <div className="table">
+        <div className="tr th" style={{gridTemplateColumns:CCOLS}}>
+          <span className="c-name">Company · sector</span>
+          <span className="c-num">P/E</span>
+          <span className="c-num">Discount vs peers</span>
+          <span className="c-num">Growth</span>
+          <span className="c-num">PEG</span>
+          <span className="c-sig">Signal</span>
+        </div>
+        {main.length===0 && <p style={{color:"var(--ink-soft)",padding:"14px 10px"}}>No buy/watch compounders in this run.</p>}
+        {main.map(Row)}
+      </div>
+      {fair.length>0 && (
+        <div className="rejected-toggle">
+          <button onClick={()=>setShowFair(v=>!v)}>{showFair?"Hide":"Show"} {fair.length} fairly-priced quality names</button>
+          <span className="hint">passed every quality gate but already priced in line with peers</span>
+        </div>
+      )}
+      {showFair && <div className="table">{fair.map(Row)}</div>}
+      <p className="foot" style={{textAlign:"left",border:"none",marginTop:16}}>
+        A "Buy" here is a relative, mean-reversion read (cheaper than comparable-quality peers), not an absolute margin of safety — so the "why is it lagging?" question matters most. {comp.counts && comp.counts.hasPriceHistory ? "Price-lag signal active." : "Price-lag signal is still building history."}
+      </p>
     </main>
   );
 }

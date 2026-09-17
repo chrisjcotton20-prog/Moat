@@ -113,3 +113,21 @@ The ticker list is written to `screen_list.txt` (git-ignored) so `watchlist.txt`
 is never modified and the working tree stays clean. The commit step uses
 `git pull --rebase --autostash` so a browser commit made mid-run can't cause a
 push rejection.
+
+---
+
+## Second lens: Overlooked Compounders
+A *relative* screen that complements Graham. It keeps strong, growing,
+financially-sound businesses (ROE >= 15%, op margin > 10%, debt/equity < 1.0,
+F-score >= 6, revenue/earnings CAGR >= 7%, market cap >= $1B) and rates them by
+whether they trade cheap versus their sector's quality-peer median P/E and cheap
+relative to their growth (PEG):
+  * Buy   = cheap on both (peer discount AND low PEG)
+  * Watch = cheap on one
+  * Fair  = priced in line with peers
+
+It also carries a **price-lag** signal — did the stock trail its peers while
+fundamentals held up — which switches on as `price_history.csv` accumulates
+(the nightly job appends one snapshot per day). Output: `public/compounders.json`,
+shown in the dashboard's **Compounders** tab. Thresholds live in
+`config.COMPOUNDERS`. Graham runs unchanged in its own tab.

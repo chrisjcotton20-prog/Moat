@@ -93,6 +93,31 @@ def main():
     rnp = metrics.compute(crns, None)
     check("no price -> graham still computed, mos None", rnp["graham"] is not None and rnp["mos"] is None)
 
+    print("\n--- Dual-class share-count bug (the MBUU case) ---")
+    # Reported cover-page shares are wrong-by-1000x (a tiny share class);
+    # income statement implies 20M shares. Without the fix, BVPS explodes.
+    _prior = {"net_income": 45e6, "assets": 1.0e9, "cfo": 65e6, "long_term_debt": 100e6,
+              "current_assets": 290e6, "current_liabilities": 150e6,
+              "revenue": 760e6, "gross_profit": 285e6}
+    dual = {"ticker": "DUAL", "entity": "Dual Class Co", "eps": 2.50,
+            "net_income": 50e6, "equity": 500e6, "total_debt": 100e6, "assets": 1.05e9,
+            "revenue": 800e6, "operating_income": 120e6, "gross_profit": 300e6,
+            "current_assets": 300e6, "current_liabilities": 150e6,
+            "cfo": 70e6, "capex": 20e6, "shares": 20000,  # <-- bad: should be ~20M
+            "fiscal_year": 2024, "ni_by_year": {2024: 50e6}, "prior": _prior}
+    rd = metrics.compute(dual, 25.00)
+    check("share count corrected to ~20M via net income / EPS", approx(rd["shares"], 20e6, 0.05),
+          f"{rd['shares']:.0f}")
+    check("BVPS sane (~$25, not $25,000)", approx(rd["bvps"], 25.0, 0.05), f"{rd['bvps']:.2f}")
+    check("Graham target sane (~$37-38, not five figures)", 30 < rd["graham"] < 45, f"{rd['graham']:.2f}")
+    check("shareWarning flag raised", rd["shareWarning"] is True)
+    check("still plausible after correction", rd["plausible"] is True)
+
+    print("\n--- Plausibility backstop (bad data derivation can't fix) ---")
+    bad = dict(dual); bad["equity"] = 50e12  # absurd equity scaling
+    rb = metrics.compute(bad, 25.00)
+    check("implausible target flagged", rb["plausible"] is False, f"graham={rb['graham']:.0f}")
+
     print()
     if FAILS:
         print(f"{len(FAILS)} FAILURE(S): {FAILS}")
